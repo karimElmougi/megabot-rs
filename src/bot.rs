@@ -6,6 +6,7 @@ use parking_lot::RwLock;
 use serenity::async_trait;
 use serenity::model::channel::Reaction;
 use serenity::model::gateway::Ready;
+use serenity::model::prelude::interaction::{Interaction, InteractionResponseType};
 use serenity::model::prelude::{ChannelId, GuildId, MessageId, ReactionType, RoleId, UserId};
 use serenity::prelude::*;
 
@@ -92,8 +93,42 @@ impl EventHandler for Handler {
         }
     }
 
-    async fn ready(&self, _: Context, ready: Ready) {
-        println!("{} is connected!", ready.user.name);
+    async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
+        if let Interaction::ApplicationCommand(command) = interaction {
+            let response_data = match command.data.name.as_str() {
+                "ping" => "pong",
+                _ => "command not yet implemented",
+            };
+
+            let result = command
+                .create_interaction_response(&ctx.http, |response| {
+                    response
+                        .kind(InteractionResponseType::ChannelMessageWithSource)
+                        .interaction_response_data(|message| message.content(response_data))
+                })
+                .await;
+
+            if let Err(e) = result {
+                log::error!("Unable to response to command: {e}");
+            }
+        }
+    }
+
+    async fn ready(&self, ctx: Context, ready: Ready) {
+        log::info!("{} is connected!", ready.user.name);
+
+        let result = self
+            .guild_id
+            .set_application_commands(&ctx.http, |commands| {
+                commands.create_application_command(|command| {
+                    command.name("ping").description("A ping command")
+                })
+            })
+            .await;
+
+        if let Err(e) = result {
+            log::error!("Unable to create commands: {e}");
+        }
     }
 }
 
