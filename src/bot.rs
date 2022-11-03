@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use parking_lot::RwLock;
 use serenity::async_trait;
-use serenity::model::channel::{Message, Reaction};
+use serenity::model::channel::Reaction;
 use serenity::model::gateway::Ready;
 use serenity::model::prelude::{ChannelId, GuildId, MessageId, ReactionType, RoleId, UserId};
 use serenity::prelude::*;
