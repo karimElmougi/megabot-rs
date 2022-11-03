@@ -24,13 +24,19 @@ pub const DEFAULT_PATH: &str = "/etc/megabot/config.toml";
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Feature {
+    /// Pinning/unpinning messages through an emoji on behalf of contributors.
     Pins,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
+    /// ID of the #mod-messages channel.
     pub moderator_channel_id: ChannelId,
+
+    /// List of role IDs that are allowed to pin/unpin using reactions.
     pub pin_roles: Vec<RoleId>,
+
+    /// Currently enabled feature flags.
     pub enabled_features: Vec<Feature>,
 }
 

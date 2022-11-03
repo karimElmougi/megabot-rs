@@ -39,13 +39,15 @@ struct Handler {
     config: Arc<RwLock<Config>>,
 }
 
+impl Handler {
+    fn is_enabled(&self, feature: Feature) -> bool {
+        self.config.read().enabled_features.contains(&feature)
+    }
+}
+
 #[async_trait]
 impl EventHandler for Handler {
     async fn reaction_add(&self, ctx: Context, reaction: Reaction) {
-        if !self.config.read().enabled_features.contains(&Feature::Pins) {
-            return;
-        }
-
         let Reaction {
             emoji,
             member,
@@ -55,7 +57,7 @@ impl EventHandler for Handler {
             ..
         } = reaction;
 
-        if is_pin_emoji(emoji) {
+        if self.is_enabled(Feature::Pins) && is_pin_emoji(emoji) {
             let user_roles = match (member, user_id) {
                 (Some(member), _) => member.roles,
                 (None, Some(user_id)) => fetch_user_roles(&ctx, user_id, self.guild_id).await,
@@ -72,10 +74,6 @@ impl EventHandler for Handler {
     }
 
     async fn reaction_remove(&self, ctx: Context, reaction: Reaction) {
-        if !self.config.read().enabled_features.contains(&Feature::Pins) {
-            return;
-        }
-
         let Reaction {
             emoji,
             member,
@@ -85,7 +83,7 @@ impl EventHandler for Handler {
             ..
         } = reaction;
 
-        if is_pin_emoji(emoji) {
+        if self.is_enabled(Feature::Pins) && is_pin_emoji(emoji) {
             let user_roles = match (member, user_id) {
                 (Some(member), _) => member.roles,
                 (None, Some(user_id)) => fetch_user_roles(&ctx, user_id, self.guild_id).await,
@@ -107,6 +105,7 @@ impl EventHandler for Handler {
 
             let response_data = match command.data.name.as_str() {
                 "ping" => "pong",
+                "codefmt" => CODE_FMT_MSG,
                 _ => "command not yet implemented",
             };
 
@@ -130,9 +129,15 @@ impl EventHandler for Handler {
         let result = self
             .guild_id
             .set_application_commands(&ctx.http, |commands| {
-                commands.create_application_command(|command| {
-                    command.name("ping").description("A ping command")
-                })
+                commands
+                    .create_application_command(|command| {
+                        command.name("ping").description("A ping command")
+                    })
+                    .create_application_command(|command| {
+                        command
+                            .name("codefmt")
+                            .description("Display a message showing how to share code samples")
+                    })
             })
             .await;
 
@@ -195,3 +200,19 @@ fn is_pin_emoji(reaction_type: ReactionType) -> bool {
         _ => false,
     }
 }
+
+const CODE_FMT_MSG: &str = r#"
+Please post your code examples and compiler output with code fences (\`\`\`) around them. Example:
+\`\`\`rust
+let (x, y) = (0, 42);
+println!("Position at {}, {}", x, y);
+\`\`\`
+
+```rust
+let (x, y) = (0, 42);
+println!("Position at {}, {}", x, y);
+```
+
+If the snippet is long or you want to demonstrate something, consider sharing it through the playground: <https://play.rust-lang.org/> or <https://www.rustexplorer.com/> or <https://paste.rs/web>.
+Please avoid sharing screenshots of your code, as they're not very accessible. Using code fences or a shared snippet makes the code more readable and allows those helping you to copy-paste the code to help explain things.
+"#;

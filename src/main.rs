@@ -14,7 +14,7 @@ use serenity::model::prelude::GuildId;
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
-    /// Path to the config file
+    /// Path to the config file.
     #[arg(short, long)]
     config: Option<String>,
 }
@@ -71,6 +71,7 @@ fn main() {
     runtime.block_on(bot::run(token, guild_id, config));
 }
 
+/// Spawns a thread that reloads the in-memory config on changes to the config file.
 fn spawn_config_watcher(
     path: PathBuf,
     config: Arc<RwLock<Config>>,
