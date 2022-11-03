@@ -1,0 +1,12 @@
+[Unit]
+Description=CSCH Megabot
+After=multi-user.target
+
+[Service]
+Type=simple
+Environment="DISCORD_TOKEN=token_goes_here"
+ExecStart=/usr/bin/megabot
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
