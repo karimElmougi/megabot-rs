@@ -20,7 +20,7 @@ struct Args {
 }
 
 fn main() {
-    pretty_env_logger::formatted_timed_builder()
+    pretty_env_logger::formatted_builder()
         .filter(None, log::LevelFilter::Info)
         .filter(Some("tracing::span"), log::LevelFilter::Warn)
         .parse_filters(&std::env::var("RUST_LOG").unwrap_or_default())

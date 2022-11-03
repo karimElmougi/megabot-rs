@@ -103,6 +103,8 @@ impl EventHandler for Handler {
 
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         if let Interaction::ApplicationCommand(command) = interaction {
+            log::info!("Received {} command", command.data.name);
+
             let response_data = match command.data.name.as_str() {
                 "ping" => "pong",
                 _ => "command not yet implemented",
@@ -117,7 +119,7 @@ impl EventHandler for Handler {
                 .await;
 
             if let Err(e) = result {
-                log::error!("Unable to response to command: {e}");
+                log::error!("Unable to respond to command: {e}");
             }
         }
     }
@@ -136,6 +138,7 @@ impl EventHandler for Handler {
 
         if let Err(e) = result {
             log::error!("Unable to create commands: {e}");
+            std::process::exit(1);
         }
     }
 }
