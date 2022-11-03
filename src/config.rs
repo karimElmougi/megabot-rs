@@ -21,10 +21,17 @@ pub const DEFAULT_PATH: &str = r"C:\Program Files\megabot\config.toml";
 #[cfg(target_family = "unix")]
 pub const DEFAULT_PATH: &str = "/etc/megabot/config.toml";
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Feature {
+    Pins,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     pub moderator_channel_id: ChannelId,
     pub pin_roles: Vec<RoleId>,
+    pub enabled_features: Vec<Feature>,
 }
 
 impl Config {

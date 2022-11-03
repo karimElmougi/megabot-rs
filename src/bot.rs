@@ -1,4 +1,4 @@
-use crate::config::Config;
+use crate::config::{Config, Feature};
 
 use std::sync::Arc;
 
@@ -42,6 +42,10 @@ struct Handler {
 #[async_trait]
 impl EventHandler for Handler {
     async fn reaction_add(&self, ctx: Context, reaction: Reaction) {
+        if !self.config.read().enabled_features.contains(&Feature::Pins) {
+            return;
+        }
+
         let Reaction {
             emoji,
             member,
@@ -68,6 +72,10 @@ impl EventHandler for Handler {
     }
 
     async fn reaction_remove(&self, ctx: Context, reaction: Reaction) {
+        if !self.config.read().enabled_features.contains(&Feature::Pins) {
+            return;
+        }
+
         let Reaction {
             emoji,
             member,
@@ -176,7 +184,7 @@ fn has_allowed_role(roles: &[RoleId], allowed_roles: &[RoleId]) -> bool {
     false
 }
 
-pub fn is_pin_emoji(reaction_type: ReactionType) -> bool {
+fn is_pin_emoji(reaction_type: ReactionType) -> bool {
     const PIN_EMOJI: &str = "📌";
 
     match reaction_type {
