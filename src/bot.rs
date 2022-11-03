@@ -1,3 +1,4 @@
+use crate::commands;
 use crate::config::{Config, Feature};
 
 use std::sync::Arc;
@@ -104,9 +105,9 @@ impl EventHandler for Handler {
             log::info!("Received {} command", command.data.name);
 
             let response_data = match command.data.name.as_str() {
-                "ping" => "pong",
-                "codefmt" => CODE_FMT_MSG,
-                _ => "command not yet implemented",
+                "ping" => "pong".to_string(),
+                "codefmt" => commands::codefmt::run(&command.data.options),
+                _ => "command not yet implemented".to_string(),
             };
 
             let result = command
@@ -130,14 +131,8 @@ impl EventHandler for Handler {
             .guild_id
             .set_application_commands(&ctx.http, |commands| {
                 commands
-                    .create_application_command(|command| {
-                        command.name("ping").description("A ping command")
-                    })
-                    .create_application_command(|command| {
-                        command
-                            .name("codefmt")
-                            .description("Display a message showing how to share code samples")
-                    })
+                    .create_application_command(commands::ping::register)
+                    .create_application_command(commands::codefmt::register)
             })
             .await;
 
@@ -200,19 +195,3 @@ fn is_pin_emoji(reaction_type: ReactionType) -> bool {
         _ => false,
     }
 }
-
-const CODE_FMT_MSG: &str = r#"
-Please post your code examples and compiler output with code fences (\`\`\`) around them. Example:
-\`\`\`rust
-let (x, y) = (0, 42);
-println!("Position at {}, {}", x, y);
-\`\`\`
-
-```rust
-let (x, y) = (0, 42);
-println!("Position at {}, {}", x, y);
-```
-
-If the snippet is long or you want to demonstrate something, consider sharing it through the playground: <https://play.rust-lang.org/> or <https://www.rustexplorer.com/> or <https://paste.rs/web>.
-Please avoid sharing screenshots of your code, as they're not very accessible. Using code fences or a shared snippet makes the code more readable and allows those helping you to copy-paste the code to help explain things.
-"#;
