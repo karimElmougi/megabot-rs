@@ -26,6 +26,8 @@ fn main() {
         .parse_filters(&std::env::var("RUST_LOG").unwrap_or_default())
         .init();
 
+    let args = Args::parse();
+
     let token = match std::env::var("DISCORD_TOKEN") {
         Ok(token) => token,
         Err(e) => {
@@ -41,8 +43,6 @@ fn main() {
             std::process::exit(1);
         }
     };
-
-    let args = Args::parse();
 
     let config_path = PathBuf::from(args.config.as_deref().unwrap_or(config::DEFAULT_PATH));
     let config = match Config::load(&config_path) {
