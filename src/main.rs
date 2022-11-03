@@ -9,6 +9,7 @@ use std::sync::Arc;
 use clap::Parser;
 use notify::{Event, RecommendedWatcher, RecursiveMode, Watcher};
 use parking_lot::RwLock;
+use serenity::model::prelude::GuildId;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -24,6 +25,22 @@ fn main() {
         .filter(Some("tracing::span"), log::LevelFilter::Warn)
         .parse_filters(&std::env::var("RUST_LOG").unwrap_or_default())
         .init();
+
+    let token = match std::env::var("DISCORD_TOKEN") {
+        Ok(token) => token,
+        Err(e) => {
+            log::error!("Unable to retrieve DISCORD_TOKEN from environment: {e}");
+            std::process::exit(1);
+        }
+    };
+
+    let guild_id = match get_guild_id() {
+        Ok(id) => id,
+        Err(e) => {
+            log::error!("Unable to retrieve DISCORD_GUILD_ID from environment: {e}");
+            std::process::exit(1);
+        }
+    };
 
     let args = Args::parse();
 
@@ -51,7 +68,7 @@ fn main() {
         .build()
         .unwrap();
 
-    runtime.block_on(bot::run(config));
+    runtime.block_on(bot::run(token, guild_id, config));
 }
 
 fn spawn_config_watcher(
@@ -82,4 +99,10 @@ fn spawn_config_watcher(
     watcher.watch(&path, RecursiveMode::NonRecursive)?;
 
     Ok(watcher)
+}
+
+fn get_guild_id() -> Result<GuildId, Box<dyn std::error::Error>> {
+    let guild_id: String = std::env::var("DISCORD_GUILD_ID")?;
+    let guild_id: u64 = guild_id.parse()?;
+    Ok(GuildId(guild_id))
 }

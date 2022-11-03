@@ -1,6 +1,5 @@
 use crate::config::Config;
 
-use std::env;
 use std::sync::Arc;
 
 use parking_lot::RwLock;
@@ -10,9 +9,7 @@ use serenity::model::gateway::Ready;
 use serenity::model::prelude::{ChannelId, GuildId, MessageId, ReactionType, RoleId, UserId};
 use serenity::prelude::*;
 
-pub async fn run(config: Arc<RwLock<Config>>) {
-    // Configure the client with your Discord bot token in the environment.
-    let token = env::var("DISCORD_TOKEN").expect("Expected a token in the environment");
+pub async fn run(token: String, guild_id: GuildId, config: Arc<RwLock<Config>>) {
     // Set gateway intents, which decides what events the bot will be notified about
     let intents = GatewayIntents::GUILD_MESSAGES
         | GatewayIntents::GUILD_MESSAGE_REACTIONS
@@ -23,7 +20,7 @@ pub async fn run(config: Arc<RwLock<Config>>) {
     // automatically prepend your bot token with "Bot ", which is a requirement
     // by Discord for bot users.
     let mut client = Client::builder(&token, intents)
-        .event_handler(Handler { config })
+        .event_handler(Handler { guild_id, config })
         .await
         .expect("Err creating client");
 
@@ -31,12 +28,13 @@ pub async fn run(config: Arc<RwLock<Config>>) {
     //
     // Shards will automatically attempt to reconnect, and will perform
     // exponential backoff until it reconnects.
-    if let Err(why) = client.start().await {
-        println!("Client error: {:?}", why);
+    if let Err(e) = client.start().await {
+        println!("Client error: {:?}", e);
     }
 }
 
 struct Handler {
+    guild_id: GuildId,
     config: Arc<RwLock<Config>>,
 }
 
@@ -49,15 +47,13 @@ impl EventHandler for Handler {
             user_id,
             channel_id,
             message_id,
-            guild_id,
             ..
         } = reaction;
+
         if is_pin_emoji(emoji) {
-            let user_roles = match (member, user_id, guild_id) {
-                (Some(member), _, _) => member.roles,
-                (None, Some(user_id), Some(guild_id)) => {
-                    fetch_user_roles(&ctx, user_id, guild_id).await
-                }
+            let user_roles = match (member, user_id) {
+                (Some(member), _) => member.roles,
+                (None, Some(user_id)) => fetch_user_roles(&ctx, user_id, self.guild_id).await,
                 _ => return log::error!("No member info for pin reaction"),
             };
 
@@ -77,15 +73,13 @@ impl EventHandler for Handler {
             user_id,
             channel_id,
             message_id,
-            guild_id,
             ..
         } = reaction;
+
         if is_pin_emoji(emoji) {
-            let user_roles = match (member, user_id, guild_id) {
-                (Some(member), _, _) => member.roles,
-                (None, Some(user_id), Some(guild_id)) => {
-                    fetch_user_roles(&ctx, user_id, guild_id).await
-                }
+            let user_roles = match (member, user_id) {
+                (Some(member), _) => member.roles,
+                (None, Some(user_id)) => fetch_user_roles(&ctx, user_id, self.guild_id).await,
                 _ => return log::error!("No member info for pin reaction"),
             };
 
