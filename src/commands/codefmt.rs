@@ -39,6 +39,6 @@ let (x, y) = (0, 42);
 println!("Position at {}, {}", x, y);
 ```
 
-If the snippet is long or you want to demonstrate something, consider sharing it through the playground: <https://play.rust-lang.org/> or <https://www.rustexplorer.com/> or <https://paste.rs/web>.
+If the snippet is long, consider sharing it through something like <https://pastebin.com/>.
 Please avoid sharing screenshots of your code, as they're not very accessible. Using code fences or a shared snippet makes the code more readable and allows those helping you to copy-paste the code to help explain things.
 "#;

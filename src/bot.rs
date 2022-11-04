@@ -18,20 +18,13 @@ pub async fn run(token: String, guild_id: GuildId, config: Arc<RwLock<Config>>) 
         | GatewayIntents::DIRECT_MESSAGES
         | GatewayIntents::MESSAGE_CONTENT;
 
-    // Create a new instance of the Client, logging in as a bot. This will
-    // automatically prepend your bot token with "Bot ", which is a requirement
-    // by Discord for bot users.
     let mut client = Client::builder(&token, intents)
         .event_handler(Handler { guild_id, config })
         .await
         .expect("Err creating client");
 
-    // Finally, start a single shard, and start listening to events.
-    //
-    // Shards will automatically attempt to reconnect, and will perform
-    // exponential backoff until it reconnects.
     if let Err(e) = client.start().await {
-        println!("Client error: {:?}", e);
+        log::error!("Client error: {:?}", e);
     }
 }
 
