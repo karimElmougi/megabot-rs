@@ -84,7 +84,13 @@ where
 
     pub fn set(&self, key: &str, data: T) -> Result<(), Error> {
         let mut inner = self.0.lock();
-        let data = serde_json::to_string(&data).map_err(write_err)?;
+        let data = serde_json::to_string(&Some(data)).map_err(write_err)?;
+        writeln!(inner.backing_storage, "{key},{data}").map_err(write_err)
+    }
+
+    pub fn unset(&self, key: &str) -> Result<(), Error> {
+        let mut inner = self.0.lock();
+        let data = serde_json::to_string(&Option::<T>::None).map_err(write_err)?;
         writeln!(inner.backing_storage, "{key},{data}").map_err(write_err)
     }
 
@@ -119,6 +125,7 @@ where
                 .next()
                 .ok_or_else(|| line_error(line_number, &line))?
                 .trim();
+
             value = serde_json::from_str(v).map_err(read_err)?;
         }
         line.clear();
@@ -147,6 +154,9 @@ mod tests {
         store.set("key1", 3).unwrap();
 
         assert_eq!(Some(3), store.get("key1").unwrap());
+
+        store.unset("key1").unwrap();
+        assert_eq!(None, store.get("key1").unwrap());
     }
 
     #[test]
