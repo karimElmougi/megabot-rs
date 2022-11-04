@@ -7,7 +7,7 @@ use serenity::model::prelude::{ChannelId, RoleId};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum ConfigError {
+pub enum Error {
     #[error("Unable to read config file: {0}")]
     Io(#[from] std::io::Error),
 
@@ -41,10 +41,10 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn load(path: &Path) -> Result<Config, ConfigError> {
+    pub fn load(path: &Path) -> Result<Config, Error> {
         let mut file = File::open(path)?;
         let mut contents = String::new();
         file.read_to_string(&mut contents)?;
-        toml::from_str(&contents).map_err(ConfigError::from)
+        toml::from_str(&contents).map_err(Error::from)
     }
 }

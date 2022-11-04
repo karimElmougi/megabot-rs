@@ -1,5 +1,5 @@
 print-bot-version:
-  @cargo pkgid | awk -F '@' '{print $2}'
+  @cargo pkgid --package megabot | awk -F '#' '{print $2}'
   
 deploy:
   cargo build --release
