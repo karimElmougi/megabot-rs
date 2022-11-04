@@ -98,7 +98,7 @@ impl EventHandler for Handler {
             log::info!("Received {} command", command.data.name);
 
             let response_data = match command.data.name.as_str() {
-                "ping" => "pong".to_string(),
+                "ping" => format!("Pong! Megabot version: {}", env!("CARGO_PKG_VERSION")),
                 "codefmt" => commands::codefmt::run(&command.data.options),
                 _ => "command not yet implemented".to_string(),
             };
