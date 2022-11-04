@@ -1,2 +1,2 @@
 [workspace]
-members = ["megabot"]
+members = ["megabot", "kv"]
