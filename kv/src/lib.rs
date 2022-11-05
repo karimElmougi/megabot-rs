@@ -30,6 +30,10 @@ fn read_err<E: std::error::Error>(err: E) -> Error {
     Error::Read(err.to_string())
 }
 
+fn line_error(line_number: usize, line: &str) -> Error {
+    Error::Read(format!("Invalid data as line {line_number}: `{line}`"))
+}
+
 #[derive(Clone)]
 pub struct Store<T>(Arc<Mutex<StoreInner<T>>>);
 
@@ -74,21 +78,21 @@ where
 
     pub fn get(&self, key: &str) -> Result<Option<T>, Error> {
         let key = validate_key(key)?;
+
         let mut inner = self.0.lock();
         inner.file.rewind().map_err(read_err)?;
 
-        let mut reader = io::BufReader::new(&inner.file);
         let mut value = None;
-        let mut line = String::with_capacity(100);
-        let mut line_number = 0;
 
-        while reader.read_line(&mut line).map_err(read_err)? != 0 {
-            let (k, v) = split_key_value(line.trim(), line_number)?;
+        let reader = io::BufReader::new(&inner.file);
+        for (line_number, line) in reader.lines().enumerate() {
+            let line = line.map_err(read_err)?;
+
+            let (k, v) = split_key_value(&line, line_number)?;
+
             if k == key {
                 value = serde_json::from_str(v).map_err(read_err)?;
             }
-            line.clear();
-            line_number += 1;
         }
 
         Ok(value)
@@ -99,28 +103,22 @@ where
         inner.file.rewind().map_err(read_err)?;
 
         let mut map = FxHashMap::default();
-        let mut line = String::new();
-        let mut line_number = 0;
 
-        let mut reader = io::BufReader::new(&inner.file);
-        while reader.read_line(&mut line).map_err(read_err)? != 0 {
-            let (k, v) = split_key_value(line.trim(), line_number)?;
+        let reader = io::BufReader::new(&inner.file);
+        for (line_number, line) in reader.lines().enumerate() {
+            let line = line.map_err(read_err)?;
+
+            let (k, v) = split_key_value(&line, line_number)?;
             let v = serde_json::from_str(v).map_err(read_err)?;
-            map.insert(k.to_string(), v);
 
-            line.clear();
-            line_number += 1;
+            map.insert(k.to_string(), v);
         }
 
         Ok(map)
     }
 }
 
-fn split_key_value(line: &str, line_number: u64) -> Result<(&str, &str), Error> {
-    fn line_error(line_number: u64, line: &str) -> Error {
-        Error::Read(format!("Invalid data as line {line_number}: `{line}`"))
-    }
-
+fn split_key_value(line: &str, line_number: usize) -> Result<(&str, &str), Error> {
     let mut split = line.split(',');
     let k = split.next().ok_or_else(|| line_error(line_number, line))?;
     let v = split.next().ok_or_else(|| line_error(line_number, line))?;
