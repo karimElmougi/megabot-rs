@@ -6,6 +6,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use parking_lot::Mutex;
+use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -16,6 +17,9 @@ pub enum Error {
 
     #[error("Unable to read record: {0}")]
     Write(String),
+
+    #[error("Key `{0}` contains invalid characters")]
+    InvalidKey(String),
 }
 
 fn write_err<E: std::error::Error>(err: E) -> Error {
@@ -26,33 +30,11 @@ fn read_err<E: std::error::Error>(err: E) -> Error {
     Error::Read(err.to_string())
 }
 
-#[derive(Debug)]
-enum Storage {
-    File(File),
-    Memory(Vec<u8>),
-}
-
-impl io::Write for Storage {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        match self {
-            Storage::File(f) => f.write(buf),
-            Storage::Memory(v) => v.write(buf),
-        }
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        match self {
-            Storage::File(f) => f.flush(),
-            Storage::Memory(_) => Ok(()),
-        }
-    }
-}
-
 #[derive(Clone)]
 pub struct Store<T>(Arc<Mutex<StoreInner<T>>>);
 
 struct StoreInner<T> {
-    backing_storage: Storage,
+    file: File,
     _phantom: PhantomData<T>,
 }
 
@@ -69,125 +51,128 @@ where
             .open(path)?;
 
         let inner = StoreInner {
-            backing_storage: Storage::File(file),
+            file,
             _phantom: PhantomData::default(),
         };
 
         Ok(Store(Arc::new(Mutex::new(inner))))
     }
 
-    pub fn in_memory() -> Self {
-        let inner = StoreInner {
-            backing_storage: Storage::Memory(Default::default()),
-            _phantom: PhantomData::default(),
-        };
-        Store(Arc::new(Mutex::new(inner)))
-    }
-
     pub fn set(&self, key: &str, data: &T) -> Result<(), Error> {
+        let key = validate_key(key)?;
         let mut inner = self.0.lock();
         let data = serde_json::to_string(&Some(data)).map_err(write_err)?;
-        writeln!(inner.backing_storage, "{key},{data}").map_err(write_err)
+        writeln!(inner.file, "{key},{data}").map_err(write_err)
     }
 
     pub fn unset(&self, key: &str) -> Result<(), Error> {
+        let key = validate_key(key)?;
         let mut inner = self.0.lock();
         let data = serde_json::to_string(&Option::<T>::None).map_err(write_err)?;
-        writeln!(inner.backing_storage, "{key},{data}").map_err(write_err)
+        writeln!(inner.file, "{key},{data}").map_err(write_err)
     }
 
     pub fn get(&self, key: &str) -> Result<Option<T>, Error> {
+        let key = validate_key(key)?;
         let mut inner = self.0.lock();
+        inner.file.rewind().map_err(read_err)?;
 
-        match inner.backing_storage {
-            Storage::File(ref mut f) => {
-                f.rewind().map_err(read_err)?;
-                search_lines(f, key)
+        let mut reader = io::BufReader::new(&inner.file);
+        let mut value = None;
+        let mut line = String::with_capacity(100);
+        let mut line_number = 0;
+
+        while reader.read_line(&mut line).map_err(read_err)? != 0 {
+            let (k, v) = split_key_value(line.trim(), line_number)?;
+            if k == key {
+                value = serde_json::from_str(v).map_err(read_err)?;
             }
-            Storage::Memory(ref mut b) => search_lines(&mut b.as_slice(), key),
+            line.clear();
+            line_number += 1;
         }
+
+        Ok(value)
+    }
+
+    pub fn to_map(&self) -> Result<FxHashMap<String, T>, Error> {
+        let mut inner = self.0.lock();
+        inner.file.rewind().map_err(read_err)?;
+
+        let mut map = FxHashMap::default();
+        let mut line = String::new();
+        let mut line_number = 0;
+
+        let mut reader = io::BufReader::new(&inner.file);
+        while reader.read_line(&mut line).map_err(read_err)? != 0 {
+            let (k, v) = split_key_value(line.trim(), line_number)?;
+            let v = serde_json::from_str(v).map_err(read_err)?;
+            map.insert(k.to_string(), v);
+
+            line.clear();
+            line_number += 1;
+        }
+
+        Ok(map)
     }
 }
 
-fn search_lines<T, R: io::Read>(reader: R, key: &str) -> Result<Option<T>, Error>
-where
-    T: for<'a> Deserialize<'a>,
-{
-    let mut reader = io::BufReader::new(reader);
-    let mut value = None;
-    let mut line = String::with_capacity(100);
-    let mut line_number = 0;
-
+fn split_key_value(line: &str, line_number: u64) -> Result<(&str, &str), Error> {
     fn line_error(line_number: u64, line: &str) -> Error {
         Error::Read(format!("Invalid data as line {line_number}: `{line}`"))
     }
 
-    while reader.read_line(&mut line).map_err(read_err)? != 0 {
-        let mut split = line.split(',');
-        let k = split.next().ok_or_else(|| line_error(line_number, &line))?;
-        if k == key {
-            let v = split
-                .next()
-                .ok_or_else(|| line_error(line_number, &line))?
-                .trim();
+    let mut split = line.split(',');
+    let k = split.next().ok_or_else(|| line_error(line_number, &line))?;
+    let v = split.next().ok_or_else(|| line_error(line_number, &line))?;
 
-            value = serde_json::from_str(v).map_err(read_err)?;
-        }
-        line.clear();
-        line_number += 1;
+    Ok((k, v))
+}
+
+fn validate_key(key: &str) -> Result<&str, Error> {
+    if key.chars().all(is_valid_char) {
+        Ok(key)
     }
+    else {
+        Err(Error::InvalidKey(key.to_string()))
+    }
+}
 
-    Ok(value)
+fn is_valid_char(c: char) -> bool {
+    match c {
+        '0'..='9' => true,
+        'A'..='Z' => true,
+        'a'..='z' => true,
+        ' ' => true,
+        _ => false,
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
+
     use tempfile::NamedTempFile;
+    use rand::Rng;
 
     #[test]
-    fn test() {
-        let store = Store::<u8>::in_memory();
-        assert_eq!(None, store.get("key1").unwrap());
-
-        store.set("key1", &1).unwrap();
-        assert_eq!(Some(1), store.get("key1").unwrap());
-        assert_eq!(None, store.get("not a key").unwrap());
-
-        store.set("key2", &1).unwrap();
-        store.set("key3", &1).unwrap();
-        store.set("key1", &2).unwrap();
-        store.set("key1", &3).unwrap();
-
-        assert_eq!(Some(3), store.get("key1").unwrap());
-
-        store.unset("key1").unwrap();
-        assert_eq!(None, store.get("key1").unwrap());
-    }
-
-    #[test]
-    fn line_error_test() {
-        let data = "key1,1\nkey2".as_bytes();
-
-        // We don't attempt to access the data if the key doesn't match, so we never notice the
-        // data is missing.
-        assert_eq!(None, search_lines::<u8, _>(data, "not a key").unwrap());
-
-        assert!(search_lines::<u8, _>(data, "key2").is_err());
-    }
-
-    #[test]
-    fn file_test() {
+    fn fuzz_test() {
         let f = NamedTempFile::new().unwrap();
         let store = Store::<u8>::open(f.path()).unwrap();
+        let mut map = HashMap::<String, u8>::new();
 
-        store.set("key1", &1).unwrap();
-        store.set("key1", &2).unwrap();
+        let mut rng = rand::thread_rng();
+        for _ in 0..100_000 {
+            let key = format!("key{}", rng.gen::<u32>());
+            let value = rng.gen();
 
-        assert_eq!(Some(2), store.get("key1").unwrap());
-        assert_eq!(Some(2), store.get("key1").unwrap());
+            store.set(&key, &value).unwrap();
+            map.insert(key, value);
+        }
 
-        store.set("key1", &3).unwrap();
-        assert_eq!(Some(3), store.get("key1").unwrap());
+        let store = store.to_map().unwrap();
+        for (key, value) in map {
+            assert_eq!(value, *store.get(&key).unwrap());
+        }
     }
 }

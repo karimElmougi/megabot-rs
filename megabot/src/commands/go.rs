@@ -8,14 +8,14 @@ pub fn run(options: &[CommandDataOption], link_store: &kv::Store<String>) -> Str
     let shortcut = get_shortcut(options).unwrap();
     match get_link(options) {
         Some(link) => match link_store.set(&shortcut, &link) {
-            Ok(()) => format!("{link} was registered under {shortcut}!"),
+            Ok(()) => format!("{link} was registered under `{shortcut}`!"),
             Err(e) => {
                 log::error!("Link store error: {e}");
                 format!("Server Error: Unable to register link :(")
             }
         },
         None => match link_store.get(&shortcut) {
-            Ok(Some(link)) => link,
+            Ok(Some(link)) => format!("`[{shortcut}]`: {link}"),
             Ok(None) => format!("No link registered under `{shortcut}`"),
             Err(e) => {
                 log::error!("Link store error: {e}");
