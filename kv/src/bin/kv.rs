@@ -25,7 +25,7 @@ fn main() -> Result<(), kv::Error> {
     let store = kv::Store::<String>::open(&Path::new(&format!("{}.db", cli.db_name))).unwrap();
 
     match cli.command {
-        Command::Set { key, value } => store.set(&key, value)?,
+        Command::Set { key, value } => store.set(&key, &value)?,
         Command::Unset { key } => store.unset(&key)?,
         Command::Get { key } => {
             let value = store.get(&key)?;
