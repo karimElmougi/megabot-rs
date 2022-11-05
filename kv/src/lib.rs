@@ -1,6 +1,6 @@
 use std::fs::File;
 use std::io;
-use std::io::{BufRead, Write};
+use std::io::{BufRead, Seek, Write};
 use std::marker::PhantomData;
 use std::path::Path;
 use std::sync::Arc;
@@ -67,10 +67,12 @@ where
             .create(true)
             .append(true)
             .open(path)?;
+
         let inner = StoreInner {
             backing_storage: Storage::File(file),
             _phantom: PhantomData::default(),
         };
+
         Ok(Store(Arc::new(Mutex::new(inner))))
     }
 
@@ -98,7 +100,10 @@ where
         let mut inner = self.0.lock();
 
         match inner.backing_storage {
-            Storage::File(ref mut f) => search_lines(f, key),
+            Storage::File(ref mut f) => {
+                f.rewind().map_err(read_err)?;
+                search_lines(f, key)
+            }
             Storage::Memory(ref mut b) => search_lines(&mut b.as_slice(), key),
         }
     }
@@ -138,6 +143,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tempfile::NamedTempFile;
 
     #[test]
     fn test() {
@@ -168,5 +174,20 @@ mod tests {
         assert_eq!(None, search_lines::<u8, _>(data, "not a key").unwrap());
 
         assert!(search_lines::<u8, _>(data, "key2").is_err());
+    }
+
+    #[test]
+    fn file_test() {
+        let f = NamedTempFile::new().unwrap();
+        let store = Store::<u8>::open(f.path()).unwrap();
+
+        store.set("key1", 1).unwrap();
+        store.set("key1", 2).unwrap();
+
+        assert_eq!(Some(2), store.get("key1").unwrap());
+        assert_eq!(Some(2), store.get("key1").unwrap());
+
+        store.set("key1", 3).unwrap();
+        assert_eq!(Some(3), store.get("key1").unwrap());
     }
 }
