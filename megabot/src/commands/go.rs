@@ -11,7 +11,7 @@ pub fn run(options: &[CommandDataOption], link_store: &kv::Store<String>) -> Str
             Ok(()) => format!("{link} was registered under `{shortcut}`!"),
             Err(e) => {
                 log::error!("Link store error: {e}");
-                format!("Server Error: Unable to register link :(")
+                "Server Error: Unable to register link :(".to_string()
             }
         },
         None => match link_store.get(&shortcut) {
@@ -19,7 +19,7 @@ pub fn run(options: &[CommandDataOption], link_store: &kv::Store<String>) -> Str
             Ok(None) => format!("No link registered under `{shortcut}`"),
             Err(e) => {
                 log::error!("Link store error: {e}");
-                format!("Server Error: Unable to fetch link :(")
+                "Server Error: Unable to fetch link :(".to_string()
             }
         },
     }

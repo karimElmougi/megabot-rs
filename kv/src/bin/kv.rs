@@ -22,7 +22,7 @@ enum Command {
 fn main() -> Result<(), kv::Error> {
     let cli = Cli::parse();
 
-    let store = kv::Store::<String>::open(&Path::new(&format!("{}.db", cli.db_name))).unwrap();
+    let store = kv::Store::<String>::open(Path::new(&format!("{}.db", cli.db_name))).unwrap();
 
     match cli.command {
         Command::Set { key, value } => store.set(&key, &value)?,

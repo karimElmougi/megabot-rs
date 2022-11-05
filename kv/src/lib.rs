@@ -10,7 +10,7 @@ use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq, Eq)]
 pub enum Error {
     #[error("Unable to write record: {0}")]
     Read(String),
@@ -122,28 +122,20 @@ fn split_key_value(line: &str, line_number: u64) -> Result<(&str, &str), Error> 
     }
 
     let mut split = line.split(',');
-    let k = split.next().ok_or_else(|| line_error(line_number, &line))?;
-    let v = split.next().ok_or_else(|| line_error(line_number, &line))?;
+    let k = split.next().ok_or_else(|| line_error(line_number, line))?;
+    let v = split.next().ok_or_else(|| line_error(line_number, line))?;
 
     Ok((k, v))
 }
 
 fn validate_key(key: &str) -> Result<&str, Error> {
-    if key.chars().all(is_valid_char) {
+    if key
+        .chars()
+        .all(|c| matches!(c, '0'..='9' | 'A'..='Z' | 'a'..='z' | ' '))
+    {
         Ok(key)
-    }
-    else {
+    } else {
         Err(Error::InvalidKey(key.to_string()))
-    }
-}
-
-fn is_valid_char(c: char) -> bool {
-    match c {
-        '0'..='9' => true,
-        'A'..='Z' => true,
-        'a'..='z' => true,
-        ' ' => true,
-        _ => false,
     }
 }
 
@@ -152,8 +144,8 @@ mod tests {
     use super::*;
     use std::collections::HashMap;
 
-    use tempfile::NamedTempFile;
     use rand::Rng;
+    use tempfile::NamedTempFile;
 
     #[test]
     fn fuzz_test() {
@@ -174,5 +166,14 @@ mod tests {
         for (key, value) in map {
             assert_eq!(value, *store.get(&key).unwrap());
         }
+    }
+
+    #[test]
+    fn validate_key_test() {
+        assert_eq!(Ok(""), validate_key(""));
+        assert_eq!(Ok("key"), validate_key("key"));
+        assert_eq!(Ok("key with spaces"), validate_key("key with spaces"));
+        assert!(validate_key("this,is,a,bad,key").is_err());
+        assert!(validate_key("this is\nalso bad").is_err());
     }
 }
