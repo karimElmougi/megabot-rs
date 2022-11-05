@@ -45,6 +45,14 @@ fn main() {
         }
     };
 
+    let golinks_db_path = match std::env::var("DISCORD_GO_LINKS_DB_PATH") {
+        Ok(path) => PathBuf::from(path),
+        Err(e) => {
+            log::error!("Unable to retrieve DISCORD_GO_LINKS_DB_PATH from environment: {e}");
+            std::process::exit(1);
+        }
+    };
+
     let config_path = PathBuf::from(args.config.as_deref().unwrap_or(config::DEFAULT_PATH));
     let config = match Config::load(&config_path) {
         Ok(config) => config,
@@ -64,12 +72,23 @@ fn main() {
         }
     };
 
+    let link_store = match kv::Store::open(&golinks_db_path) {
+        Ok(store) => store,
+        Err(e) => {
+            log::error!(
+                "Unable to open `{}`: {e}",
+                golinks_db_path.to_string_lossy()
+            );
+            std::process::exit(1);
+        }
+    };
+
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
         .unwrap();
 
-    runtime.block_on(bot::run(token, guild_id, config));
+    runtime.block_on(bot::run(token, guild_id, config, link_store));
 }
 
 /// Spawns a thread that reloads the in-memory config on changes to the config file.

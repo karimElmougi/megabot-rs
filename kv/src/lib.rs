@@ -84,7 +84,7 @@ where
         Store(Arc::new(Mutex::new(inner)))
     }
 
-    pub fn set(&self, key: &str, data: T) -> Result<(), Error> {
+    pub fn set(&self, key: &str, data: &T) -> Result<(), Error> {
         let mut inner = self.0.lock();
         let data = serde_json::to_string(&Some(data)).map_err(write_err)?;
         writeln!(inner.backing_storage, "{key},{data}").map_err(write_err)
@@ -150,14 +150,14 @@ mod tests {
         let store = Store::<u8>::in_memory();
         assert_eq!(None, store.get("key1").unwrap());
 
-        store.set("key1", 1).unwrap();
+        store.set("key1", &1).unwrap();
         assert_eq!(Some(1), store.get("key1").unwrap());
         assert_eq!(None, store.get("not a key").unwrap());
 
-        store.set("key2", 1).unwrap();
-        store.set("key3", 1).unwrap();
-        store.set("key1", 2).unwrap();
-        store.set("key1", 3).unwrap();
+        store.set("key2", &1).unwrap();
+        store.set("key3", &1).unwrap();
+        store.set("key1", &2).unwrap();
+        store.set("key1", &3).unwrap();
 
         assert_eq!(Some(3), store.get("key1").unwrap());
 
@@ -181,13 +181,13 @@ mod tests {
         let f = NamedTempFile::new().unwrap();
         let store = Store::<u8>::open(f.path()).unwrap();
 
-        store.set("key1", 1).unwrap();
-        store.set("key1", 2).unwrap();
+        store.set("key1", &1).unwrap();
+        store.set("key1", &2).unwrap();
 
         assert_eq!(Some(2), store.get("key1").unwrap());
         assert_eq!(Some(2), store.get("key1").unwrap());
 
-        store.set("key1", 3).unwrap();
+        store.set("key1", &3).unwrap();
         assert_eq!(Some(3), store.get("key1").unwrap());
     }
 }

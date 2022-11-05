@@ -11,7 +11,12 @@ use serenity::model::prelude::interaction::{Interaction, InteractionResponseType
 use serenity::model::prelude::{ChannelId, GuildId, MessageId, ReactionType, RoleId, UserId};
 use serenity::prelude::*;
 
-pub async fn run(token: String, guild_id: GuildId, config: Arc<RwLock<Config>>) {
+pub async fn run(
+    token: String,
+    guild_id: GuildId,
+    config: Arc<RwLock<Config>>,
+    link_store: kv::Store<String>,
+) {
     // Set gateway intents, which decides what events the bot will be notified about
     let intents = GatewayIntents::GUILD_MESSAGES
         | GatewayIntents::GUILD_MESSAGE_REACTIONS
@@ -19,7 +24,11 @@ pub async fn run(token: String, guild_id: GuildId, config: Arc<RwLock<Config>>) 
         | GatewayIntents::MESSAGE_CONTENT;
 
     let mut client = Client::builder(&token, intents)
-        .event_handler(Handler { guild_id, config })
+        .event_handler(Handler {
+            guild_id,
+            config,
+            link_store,
+        })
         .await
         .expect("Err creating client");
 
@@ -30,6 +39,7 @@ pub async fn run(token: String, guild_id: GuildId, config: Arc<RwLock<Config>>) 
 
 struct Handler {
     guild_id: GuildId,
+    link_store: kv::Store<String>,
     config: Arc<RwLock<Config>>,
 }
 
@@ -100,6 +110,7 @@ impl EventHandler for Handler {
             let response_data = match command.data.name.as_str() {
                 "ping" => format!("Pong! Megabot version: {}", env!("CARGO_PKG_VERSION")),
                 "codefmt" => commands::codefmt::run(&command.data.options),
+                "go" => commands::go::run(&command.data.options, &self.link_store),
                 _ => "command not yet implemented".to_string(),
             };
 
@@ -126,6 +137,7 @@ impl EventHandler for Handler {
                 commands
                     .create_application_command(commands::ping::register)
                     .create_application_command(commands::codefmt::register)
+                    .create_application_command(commands::go::register)
             })
             .await;
 

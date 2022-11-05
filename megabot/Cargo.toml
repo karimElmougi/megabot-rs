@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 clap = { version = "4", features = ["derive"] }
 config = "0.13"
+kv = { path = "../kv" }
 log = { version = "0.4", default-features = false }
 notify = "5"
 parking_lot = "0.12"
