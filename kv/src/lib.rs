@@ -109,9 +109,11 @@ where
             let line = line.map_err(read_err)?;
 
             let (k, v) = split_key_value(&line, line_number)?;
-            let v = serde_json::from_str(v).map_err(read_err)?;
+            let v: Option<T> = serde_json::from_str(v).map_err(read_err)?;
 
-            map.insert(k.to_string(), v);
+            if let Some(v) = v {
+                map.insert(k.to_string(), v);
+            }
         }
 
         Ok(map)
