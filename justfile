@@ -24,3 +24,6 @@ stop:
 
 restart:
   sudo systemctl restart megabot
+
+edit-config:
+  sudo vim /etc/megabot/config.toml
