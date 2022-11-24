@@ -40,6 +40,19 @@ pub struct Config {
     pub enabled_features: Vec<Feature>,
 }
 
+impl std::fmt::Display for Config {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Config")
+            .field("moderator_channel_id", &self.moderator_channel_id.0)
+            .field(
+                "pin_roles",
+                &self.pin_roles.iter().map(|r| r.0).collect::<Vec<_>>(),
+            )
+            .field("enabled_features", &self.enabled_features)
+            .finish()
+    }
+}
+
 impl Config {
     pub fn load(path: &Path) -> Result<Config, Error> {
         let mut file = File::open(path)?;

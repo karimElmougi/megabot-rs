@@ -105,7 +105,11 @@ impl EventHandler for Handler {
 
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         if let Interaction::ApplicationCommand(command) = interaction {
-            log::info!("Received {} command", command.data.name);
+            log::info!(
+                "Received {} command from user {}",
+                command.data.name,
+                command.user.id.0
+            );
 
             let response_data = match command.data.name.as_str() {
                 "ping" => format!("Pong! Megabot version: {}", env!("CARGO_PKG_VERSION")),

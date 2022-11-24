@@ -4,8 +4,8 @@ mod config;
 
 use crate::config::Config;
 
-use std::path::PathBuf;
 use std::sync::Arc;
+use std::{path::PathBuf, time::Duration};
 
 use clap::Parser;
 use notify::{Event, RecommendedWatcher, RecursiveMode, Watcher};
@@ -22,8 +22,8 @@ struct Args {
 
 fn main() {
     pretty_env_logger::formatted_builder()
-        .filter(None, log::LevelFilter::Info)
-        .filter(Some("tracing::span"), log::LevelFilter::Warn)
+        .filter(None, log::LevelFilter::Warn)
+        .filter(Some("megabot"), log::LevelFilter::Info)
         .parse_filters(&std::env::var("RUST_LOG").unwrap_or_default())
         .init();
 
@@ -61,8 +61,8 @@ fn main() {
             std::process::exit(1);
         }
     };
+    log::info!("Config loaded successfully: {}", config);
     let config = Arc::new(RwLock::new(config));
-    log::info!("Config loaded successfully: {:#?}", config);
 
     let _watcher = match spawn_config_watcher(config_path, config.clone()) {
         Ok(watcher) => watcher,
@@ -88,7 +88,19 @@ fn main() {
         .build()
         .unwrap();
 
+    runtime.spawn(heartbeat());
     runtime.block_on(bot::run(token, guild_id, config, link_store));
+}
+
+async fn heartbeat() {
+    let mut interval = tokio::time::interval(Duration::from_secs(60));
+
+    let mut seq: u64 = 0;
+    loop {
+        interval.tick().await;
+        log::info!("Hearthbeat: seq = {seq}");
+        seq += 1;
+    }
 }
 
 /// Spawns a thread that reloads the in-memory config on changes to the config file.
